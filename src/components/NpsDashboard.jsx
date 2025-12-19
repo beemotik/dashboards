@@ -665,7 +665,7 @@ const NpsDashboard = () => {
              
              <div className="flex gap-2 sm:self-end">
                 <Button 
-                   className="bg-[#8b5cf6] text-white hover:bg-[#7c3aed] font-bold h-9 border border-[#8b5cf6]/50"
+                   className="bg-[#E8B930] text-black hover:bg-[#d1a525] font-bold h-9"
                    disabled={!selectedCompany}
                    onClick={handleGenerateAnalysis}
                 >
