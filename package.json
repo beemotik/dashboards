@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "vite --host :: --port 3000",
-    "build": "vite build",
+    "build": "vite build --config vite.config.production.js",
+    "build:dev": "vite build",
     "build:with-llms": "node tools/generate-llms.js && vite build",
     "preview": "vite preview --host :: --port 3000"
   },
