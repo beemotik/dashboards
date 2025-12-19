@@ -1,2 +1,7 @@
 ## Pages
-- [Dashboard](/)): Painel administrativo de dashboards da Beemotik
+- [Dashboard Reuniões](/dashboards/reunioes): Painel administrativo de dashboards da Beemotik para análise de reuniões
+- [Dashboard Consultores](/dashboards/consultores): Análise de performance dos consultores
+- [Dashboard NPS](/dashboards/nps): Análise de Net Promoter Score
+- [Dashboard WhatsApp](/dashboards/grupos-whatsapp): Análise de grupos do WhatsApp
+- [Dashboard Conversas](/dashboards/conversas): Análise de conversas
+- [Dashboard SAC](/dashboards/sac): Sistema de Atendimento ao Cliente
