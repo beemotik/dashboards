@@ -58,7 +58,7 @@ const Dashboard = () => {
   // Initialize filters with context values
   const [filters, setFilters] = useState({
     tenantId: tenantId,
-    companyName: '', 
+    companyName: '',
     storeName: '',
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0],
@@ -78,7 +78,7 @@ const Dashboard = () => {
 
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  
+
   // If context changes, update filters
   useEffect(() => {
     setFilters(prev => ({
@@ -97,40 +97,48 @@ const Dashboard = () => {
     const initCompanies = async () => {
       setCompaniesLoading(true);
 
+      // Block dropdown and show no options for non-admin tenants
+      if (!isAdmin) {
+        setAvailableCompanies([]);
+        setIsDropdownLocked(true);
+        setCompaniesLoading(false);
+        return;
+      }
+
       // Check if current tenant has a specific configuration
       const tenantConfig = TENANT_CONFIG[filters.tenantId];
 
       if (tenantConfig) {
         // Use configured options
         setAvailableCompanies(tenantConfig.options);
-        
+
         // Set lock state from config
         setIsDropdownLocked(tenantConfig.lock);
-        
+
         // Auto-select default if not already selected
         if (!filters.companyName || !tenantConfig.options.includes(filters.companyName)) {
-           const defaultComp = tenantConfig.defaultOption;
-           setFilters(prev => ({ ...prev, companyName: defaultComp }));
-           
-           // Auto-apply if we have dates
-           if (filters.from && filters.to) {
-             setAppliedFilters(prev => ({
-               ...prev,
-               tenantId: filters.tenantId,
-               companyName: defaultComp,
-               from: filters.from,
-               to: filters.to
-             }));
-           }
+          const defaultComp = tenantConfig.defaultOption;
+          setFilters(prev => ({ ...prev, companyName: defaultComp }));
+
+          // Auto-apply if we have dates
+          if (filters.from && filters.to) {
+            setAppliedFilters(prev => ({
+              ...prev,
+              tenantId: filters.tenantId,
+              companyName: defaultComp,
+              from: filters.from,
+              to: filters.to
+            }));
+          }
         }
       } else {
         // Fallback to API fetch for unknown tenants
         const companies = await fetchAllCompanyNames(filters.tenantId);
         setAvailableCompanies(companies);
-        
+
         // Determine lock state: Lock if only 1 company found, otherwise unlock
         setIsDropdownLocked(companies.length <= 1);
-        
+
         // Auto-select if there's only one company or matches context
         let autoFill = '';
         if (companyName && companies.includes(companyName)) {
@@ -140,8 +148,8 @@ const Dashboard = () => {
         }
 
         if (autoFill) {
-           setFilters(prev => ({ ...prev, companyName: autoFill }));
-           if (filters.from && filters.to) {
+          setFilters(prev => ({ ...prev, companyName: autoFill }));
+          if (filters.from && filters.to) {
             setAppliedFilters(prev => ({
               ...prev,
               tenantId: filters.tenantId,
@@ -158,7 +166,7 @@ const Dashboard = () => {
     if (filters.tenantId) {
       initCompanies();
     }
-  }, [filters.tenantId, companyName]); 
+  }, [filters.tenantId, companyName, isAdmin]);
 
 
   const handleFilterChange = newFilters => {
@@ -189,9 +197,9 @@ const Dashboard = () => {
         </header>
       )}
 
-      <FilterBar 
-        filters={filters} 
-        onFilterChange={handleFilterChange} 
+      <FilterBar
+        filters={filters}
+        onFilterChange={handleFilterChange}
         onApply={handleApplyFilters}
         meetings={meetings}
         availableCompanies={availableCompanies}
@@ -201,29 +209,29 @@ const Dashboard = () => {
 
       <main className="p-6 space-y-10 pb-20">
         {!hasAppliedFilters ? (
-           <div className="flex flex-col items-center justify-center h-[400px] text-gray-400">
-             <AlertCircle className="w-12 h-12 mb-4 text-gold-light" />
-             <h2 className="text-xl font-domine font-semibold text-white mb-2">Selecione os Filtros</h2>
-             <p className="max-w-md text-center font-manrope">
-               Para visualizar o dashboard, por favor selecione uma <strong>Empresa</strong> e o <strong>Período</strong> desejado e clique em "Filtrar".
-             </p>
-           </div>
+          <div className="flex flex-col items-center justify-center h-[400px] text-gray-400">
+            <AlertCircle className="w-12 h-12 mb-4 text-gold-light" />
+            <h2 className="text-xl font-domine font-semibold text-white mb-2">Selecione os Filtros</h2>
+            <p className="max-w-md text-center font-manrope">
+              Para visualizar o dashboard, por favor selecione uma <strong>Empresa</strong> e o <strong>Período</strong> desejado e clique em "Filtrar".
+            </p>
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 min-h-[700px]">
-              <ScoresCard 
-                meetings={meetings} 
-                loading={loading} 
-                filters={appliedFilters} 
+              <ScoresCard
+                meetings={meetings}
+                loading={loading}
+                filters={appliedFilters}
               />
-              <BadCommentsCard 
+              <BadCommentsCard
                 meetings={meetings}
                 loading={loading}
               />
             </div>
 
             <div className="min-h-[700px]">
-              <MeetingsCard 
+              <MeetingsCard
                 meetings={meetings}
                 loading={loading}
                 onMeetingClick={handleMeetingClick}
@@ -231,7 +239,7 @@ const Dashboard = () => {
             </div>
 
             <div className="min-h-[700px]">
-              <TimelineCard 
+              <TimelineCard
                 meetings={meetings}
                 loading={loading}
               />

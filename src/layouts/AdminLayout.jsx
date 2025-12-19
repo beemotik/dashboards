@@ -15,11 +15,7 @@ import {
   Webhook,
   ChevronDown,
   ChevronRight,
-  Database,
-  Briefcase,
-  HelpCircle,
-  PanelLeftClose,
-  PanelLeftOpen
+  Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/context/AppContext';
@@ -50,15 +46,18 @@ const SidebarItem = ({ to, icon: Icon, label, onClick, end }) => {
 
 const AdminLayout = () => {
   const { isAdmin, username, companyName } = useAppContext();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile state
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true); // Desktop toggle state
+  const [searchParams] = useSearchParams();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(true);
   
-  const showSidebar = isAdmin;
+  // Check if there are any URL parameters
+  const hasUrlParams = searchParams.toString().length > 0;
+  
+  // Hide sidebar when there are URL parameters or user is not admin
+  const showSidebar = isAdmin && !hasUrlParams;
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
-  const toggleSidebarVisibility = () => setIsSidebarVisible(!isSidebarVisible);
 
   return (
     <div className="min-h-screen bg-[#1B1B1B] flex flex-col md:flex-row">
@@ -87,13 +86,13 @@ const AdminLayout = () => {
         )}
       </AnimatePresence>
 
-      {/* Sidebar (Desktop & Mobile) */}
-      {showSidebar && isSidebarVisible && (
+      {/* Sidebar */}
+      {showSidebar && (
         <aside
           className={`
-            fixed md:sticky top-0 left-0 h-full w-64 bg-[#2F2F2F] border-r border-[#3C4144] z-50 transform transition-transform duration-300 ease-in-out flex flex-col
+            fixed md:sticky top-0 left-0 h-full w-64 bg-[#2F2F2F] border-r border-[#3C4144] z-50 transform transition-transform duration-300 ease-in-out
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            md:translate-x-0 md:h-screen
+            md:translate-x-0 md:h-screen flex flex-col
           `}
         >
           <div className="p-6 border-b border-[#3C4144] flex items-center justify-between">
@@ -102,16 +101,6 @@ const AdminLayout = () => {
             </h1>
             <Button variant="ghost" size="icon" onClick={closeSidebar} className="md:hidden text-gray-400">
               <X className="w-5 h-5" />
-            </Button>
-            {/* Desktop Close Sidebar Button */}
-            <Button 
-               variant="ghost" 
-               size="icon" 
-               onClick={toggleSidebarVisibility} 
-               className="hidden md:flex text-gray-400 hover:text-white hover:bg-[#3C4144]/30"
-               title="Recolher Menu"
-            >
-               <PanelLeftClose className="w-5 h-5" />
             </Button>
           </div>
 
@@ -134,12 +123,6 @@ const AdminLayout = () => {
               label="Reuniões" 
               onClick={closeSidebar}
             />
-             <SidebarItem 
-              to="/dashboards/consultores" 
-              icon={Briefcase} 
-              label="Consultores" 
-              onClick={closeSidebar}
-            />
             <SidebarItem 
               to="/dashboards/grupos-whatsapp" 
               icon={MessageCircle} 
@@ -150,12 +133,6 @@ const AdminLayout = () => {
               to="/dashboards/conversas" 
               icon={MessageSquare} 
               label="Conversas" 
-              onClick={closeSidebar}
-            />
-            <SidebarItem 
-              to="/dashboards/sac" 
-              icon={HelpCircle} 
-              label="SAC" 
               onClick={closeSidebar}
             />
             
@@ -230,21 +207,6 @@ const AdminLayout = () => {
             </div>
           </div>
         </aside>
-      )}
-
-      {/* Expand Button (Visible when sidebar is hidden on Desktop) */}
-      {showSidebar && !isSidebarVisible && (
-         <div className="hidden md:block fixed top-4 left-4 z-50">
-            <Button 
-               variant="outline" 
-               size="icon" 
-               onClick={toggleSidebarVisibility} 
-               className="bg-[#2F2F2F] border-[#3C4144] text-white hover:bg-[#3C4144]"
-               title="Expandir Menu"
-            >
-               <PanelLeftOpen className="w-5 h-5" />
-            </Button>
-         </div>
       )}
 
       {/* Main Content */}

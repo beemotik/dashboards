@@ -65,10 +65,14 @@ const FilterBar = ({
             <Select
               value={filters.companyName}
               onValueChange={(val) => handleSelectChange('companyName', val)}
-              disabled={companiesLoading || isDropdownLocked}
+              disabled={companiesLoading || isDropdownLocked || availableCompanies.length === 0}
             >
               <SelectTrigger className="bg-[#33393D] border-[#4C4E50] text-white h-10 w-full opacity-100 disabled:opacity-80 disabled:cursor-not-allowed">
-                <SelectValue placeholder={companiesLoading ? "Carregando..." : "Selecione..."} />
+                <SelectValue placeholder={
+                  companiesLoading ? "Carregando..." : 
+                  availableCompanies.length === 0 ? "Acesso restrito" :
+                  "Selecione..."
+                } />
               </SelectTrigger>
               <SelectContent className="bg-[#2F2F2F] border-[#4C4E50] text-white max-w-[300px]">
                 {availableCompanies.map((company) => (

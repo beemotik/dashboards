@@ -7,18 +7,12 @@ import Dashboard from '@/components/Dashboard';
 import WhatsAppGroupsDashboard from '@/components/WhatsAppGroupsDashboard';
 import NpsDashboard from '@/components/NpsDashboard';
 import ConversasDashboard from '@/components/ConversasDashboard';
-import ConsultoresDashboard from '@/components/ConsultoresDashboard';
 import DebugAnalysis from '@/components/DebugAnalysis';
-import SACTab from '@/components/SACTab';
 import Placeholder from '@/pages/Placeholder';
 import { Toaster } from '@/components/ui/toaster';
 import { AppProvider } from '@/context/AppContext';
 
 function App() {
-  // Debug log para verificar se a aplicação está carregando
-  console.log('App loading - Current URL:', window.location.href);
-  console.log('App loading - Search params:', window.location.search);
-  
   return (
     <>
       <Helmet>
@@ -37,11 +31,9 @@ function App() {
             <Route index element={<Navigate to="/dashboards/reunioes" replace />} />
             
             <Route path="reunioes" element={<Dashboard />} />
-            <Route path="consultores" element={<ConsultoresDashboard />} />
             <Route path="nps" element={<NpsDashboard />} />
             <Route path="grupos-whatsapp" element={<WhatsAppGroupsDashboard />} />
             <Route path="conversas" element={<ConversasDashboard />} />
-            <Route path="sac" element={<SACTab />} />
             <Route path="analysis" element={<DebugAnalysis />} />
             
             <Route path="etc1" element={<Placeholder title="Análise Financeira" />} />
