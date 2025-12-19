@@ -1,31 +1,48 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useAppContext } from '@/context/AppContext';
 import { 
   Filter, 
   AlertCircle, 
-  Search, 
   MessageCircle, 
   ChevronRight, 
   ChevronLeft,
-  Calendar,
-  User,
   Clock,
-  MessageSquare,
   HelpCircle,
-  FileText
+  FileText,
+  ThumbsUp,
+  ThumbsDown,
+  AlertTriangle,
+  CheckCircle2,
+  Inbox
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LabelList
+} from 'recharts';
+
+const COLORS = ['#E8B930', '#22c55e', '#ef4444', '#3b82f6', '#a855f7', '#f97316', '#64748b'];
 
 const SACTab = () => {
   const { tenantId, companyName: contextCompanyName, isAdmin } = useAppContext();
@@ -63,11 +80,14 @@ const SACTab = () => {
     const today = new Date();
     // First day of current month
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    // Last day of current month (or today if we want up to now, usually just today is fine for 'to')
-    // Let's set 'to' as today to avoid future dates being default, but 'from' as 1st of month.
     
     // Format to YYYY-MM-DD
-    const formatDate = (date) => date.toISOString().split('T')[0];
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
 
     setFilters(prev => ({
       ...prev,
@@ -169,23 +189,15 @@ const SACTab = () => {
       if (filters.tipo !== 'all') query = query.eq('tipo', filters.tipo);
       if (filters.status !== 'all') query = query.eq('ticket_status', filters.status);
       
-      // If we are not admin, filter by tenant_id (unless tenant_id matches master, but usually good practice)
-      // Note: The context tenantId might be the master tenant, or specific company tenant. 
-      // If the user selects a company, we filter by that company name.
-      // Usually we also filter by tenant_id column if present to be safe, but 'empresa' name is the primary filter in this UI.
-      // query = query.eq('tenant_id', tenantId); 
-
       const { data, error } = await query;
 
       if (error) throw error;
 
       // Group by thread_id, keep latest
-      // The query returns ordered by created_at DESC, so the first occurrence of a thread_id is the latest event.
       const threadsMap = new Map();
       
       (data || []).forEach(event => {
         if (!event.thread_id) return;
-        
         // Only add if not already present (since we want the first one = latest)
         if (!threadsMap.has(event.thread_id)) {
           threadsMap.set(event.thread_id, event);
@@ -225,6 +237,99 @@ const SACTab = () => {
     }
   };
 
+  // --- Executive Dashboard Data Calculations ---
+  const dashboardData = useMemo(() => {
+    if (!tickets.length) return null;
+
+    let total = 0;
+    let reclamacoes = 0;
+    let elogios = 0;
+    let duvidas = 0; // Includes 'duvida' and others not reclamacao/elogio
+    let abertos = 0;
+    
+    const canalStats = {}; // { canalName: { total: 0, reclamacoes: 0, ratingSum: 0, ratingCount: 0 } }
+    const statusStats = {}; // { statusName: count }
+
+    const openStatuses = ['novo', 'em_andamento', 'aguardando_cliente'];
+
+    tickets.forEach(t => {
+      total++;
+      const tipo = (t.tipo || '').toLowerCase();
+      const status = (t.ticket_status || 'indefinido').toLowerCase();
+      const canal = (t.canal || 'outros').toLowerCase();
+      const nota = t.nota ? parseFloat(t.nota) : null;
+
+      // Big Numbers
+      if (tipo === 'reclamacao' || tipo === 'reclamação') {
+        reclamacoes++;
+      } else if (tipo === 'elogio') {
+        elogios++;
+      } else {
+        duvidas++;
+      }
+
+      if (openStatuses.includes(status) || status === 'open' || status.includes('pending')) {
+        abertos++;
+      }
+
+      // Channel Stats
+      if (!canalStats[canal]) {
+        canalStats[canal] = { total: 0, reclamacoes: 0, ratingSum: 0, ratingCount: 0 };
+      }
+      canalStats[canal].total++;
+      if (tipo === 'reclamacao' || tipo === 'reclamação') {
+        canalStats[canal].reclamacoes++;
+      }
+      if (nota !== null && !isNaN(nota)) {
+        canalStats[canal].ratingSum += nota;
+        canalStats[canal].ratingCount++;
+      }
+
+      // Status Stats
+      if (!statusStats[status]) {
+        statusStats[status] = 0;
+      }
+      statusStats[status]++;
+    });
+
+    // Transform for Charts
+    const chartTicketsByCanal = Object.keys(canalStats).map(c => ({
+      name: c.charAt(0).toUpperCase() + c.slice(1),
+      value: canalStats[c].total
+    })).sort((a, b) => b.value - a.value);
+
+    const chartComplaintsByCanal = Object.keys(canalStats).map(c => ({
+      name: c.charAt(0).toUpperCase() + c.slice(1),
+      value: canalStats[c].reclamacoes
+    })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+
+    const chartAvgRatingByCanal = Object.keys(canalStats).map(c => {
+       const stat = canalStats[c];
+       const avg = stat.ratingCount > 0 ? (stat.ratingSum / stat.ratingCount) : 0;
+       return {
+         name: c.charAt(0).toUpperCase() + c.slice(1),
+         value: parseFloat(avg.toFixed(1))
+       };
+    }).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+
+    const chartStatus = Object.keys(statusStats).map(s => ({
+      name: s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      value: statusStats[s]
+    })).sort((a, b) => b.value - a.value);
+
+    return {
+      total,
+      reclamacoes,
+      elogios,
+      duvidas,
+      abertos,
+      chartTicketsByCanal,
+      chartComplaintsByCanal,
+      chartAvgRatingByCanal,
+      chartStatus
+    };
+  }, [tickets]);
+
   // Pagination
   const totalPages = Math.ceil(tickets.length / ITEMS_PER_PAGE);
   const paginatedTickets = tickets.slice(
@@ -235,7 +340,6 @@ const SACTab = () => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
-      // Adjust for timezone if needed, or just use UTC date string part
       return new Date(dateString).toLocaleDateString('pt-BR');
     } catch { return dateString; }
   };
@@ -265,6 +369,21 @@ const SACTab = () => {
     { value: 'site', label: 'Site' },
     { value: 'google_business', label: 'Google Business' }
   ];
+
+  // Custom Chart Tooltip
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-[#2F2F2F] border border-[#4C4E50] p-2 rounded shadow-lg">
+          <p className="text-white font-bold text-sm">{label}</p>
+          <p className="text-[#E8B930] text-sm">
+            {payload[0].value}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="min-h-full p-6 space-y-6">
@@ -398,94 +517,272 @@ const SACTab = () => {
           </p>
         </div>
       ) : (
-        <Card className="bg-[#252525] border-[#3C4144] shadow-xl">
-          <CardHeader className="border-b border-[#3C4144] pb-4">
-             <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-domine text-white flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5 text-[#E8B930]" /> Tickets SAC
-                </CardTitle>
-                <div className="text-sm text-gray-400">Total: {tickets.length}</div>
-             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-             <Table>
-                <TableHeader className="bg-[#2F2F2F]">
-                   <TableRow className="border-b-[#3C4144] hover:bg-[#2F2F2F]">
-                      <TableHead className="text-gray-400 font-bold">Canal</TableHead>
-                      <TableHead className="text-gray-400 font-bold">Cliente</TableHead>
-                      <TableHead className="text-gray-400 font-bold">Tipo</TableHead>
-                      <TableHead className="text-gray-400 font-bold">Status</TableHead>
-                      <TableHead className="text-gray-400 font-bold">Nota</TableHead>
-                      <TableHead className="text-gray-400 font-bold">Resumo</TableHead>
-                      <TableHead className="text-gray-400 font-bold text-right">Data</TableHead>
-                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                   {paginatedTickets.length === 0 ? (
-                      <TableRow>
-                         <TableCell colSpan={7} className="text-center py-12 text-gray-500">Nenhum ticket encontrado.</TableCell>
-                      </TableRow>
-                   ) : (
-                      paginatedTickets.map((ticket, idx) => (
-                         <TableRow 
-                            key={idx} 
-                            onClick={() => handleTicketClick(ticket)}
-                            className="border-b-[#3C4144] hover:bg-[#2F2F2F] cursor-pointer transition-colors"
-                         >
-                            <TableCell className="text-gray-300 font-medium capitalize">{ticket.canal}</TableCell>
-                            <TableCell className="text-white">
-                               <div className="flex flex-col">
-                                  <span>{ticket.autor_nome || 'Anônimo'}</span>
-                                  <span className="text-xs text-gray-500">{ticket.autor_contato}</span>
-                               </div>
-                            </TableCell>
-                            <TableCell className="text-gray-300">{ticket.tipo || '-'}</TableCell>
-                            <TableCell>
-                               <Badge className={getStatusColor(ticket.ticket_status)}>
-                                  {ticket.ticket_status || 'N/A'}
-                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-gray-300 font-mono">{ticket.nota || '—'}</TableCell>
-                            <TableCell className="text-gray-400 max-w-[300px] truncate" title={ticket.text}>
-                               {ticket.text || '-'}
-                            </TableCell>
-                            <TableCell className="text-right text-gray-300">{formatDate(ticket.created_at)}</TableCell>
-                         </TableRow>
-                      ))
-                   )}
-                </TableBody>
-             </Table>
+        <div className="space-y-6">
+          
+          {/* Executive Dashboard (Painel Executivo) */}
+          {dashboardData && (
+             <div className="space-y-6 animate-in fade-in-50 duration-500">
+                <h2 className="text-xl font-domine font-bold text-white border-l-4 border-[#E8B930] pl-3">Painel Executivo</h2>
+                
+                {/* Big Numbers Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <Card className="bg-[#252525] border-[#3C4144]">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-400">Total de Tickets</CardTitle>
+                      <Inbox className="h-4 w-4 text-[#E8B930]" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-white">{dashboardData.total}</div>
+                      <p className="text-xs text-gray-500">Atendimentos no período</p>
+                    </CardContent>
+                  </Card>
 
-             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="p-4 border-t border-[#3C4144] flex items-center justify-between bg-[#2F2F2F]">
-                <span className="text-xs text-gray-500">
-                  Página {currentPage} de {totalPages}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="h-8 w-8 p-0 border-[#4C4E50] bg-[#252525] text-gray-300 hover:bg-[#33393D] hover:text-white"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="h-8 w-8 p-0 border-[#4C4E50] bg-[#252525] text-gray-300 hover:bg-[#33393D] hover:text-white"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                  <Card className="bg-[#252525] border-[#3C4144]">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-400">Reclamações</CardTitle>
+                      <ThumbsDown className="h-4 w-4 text-red-500" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-white">{dashboardData.reclamacoes}</div>
+                      <Badge variant="outline" className="mt-1 bg-red-500/10 text-red-500 border-red-500/20 text-[10px]">
+                        Crítico
+                      </Badge>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-[#252525] border-[#3C4144]">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-400">Elogios</CardTitle>
+                      <ThumbsUp className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-white">{dashboardData.elogios}</div>
+                      <p className="text-xs text-green-500/80">Feedbacks positivos</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-[#252525] border-[#3C4144]">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-400">Dúvidas / Outros</CardTitle>
+                      <HelpCircle className="h-4 w-4 text-blue-500" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-white">{dashboardData.duvidas}</div>
+                      <p className="text-xs text-gray-500">Geral</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-[#252525] border-[#3C4144]">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-gray-400">Tickets Abertos</CardTitle>
+                      <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-white">{dashboardData.abertos}</div>
+                      <p className="text-xs text-orange-500">Pendentes de ação</p>
+                    </CardContent>
+                  </Card>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+
+                {/* Charts Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                   {/* Chart 1: Tickets per Channel */}
+                   <Card className="bg-[#252525] border-[#3C4144]">
+                      <CardHeader>
+                         <CardTitle className="text-base text-white">Tickets por Canal</CardTitle>
+                         <CardDescription className="text-xs text-gray-400">Volume de atendimento por origem</CardDescription>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+                         <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={dashboardData.chartTicketsByCanal} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                               <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={false} />
+                               <XAxis type="number" stroke="#666" fontSize={12} />
+                               <YAxis dataKey="name" type="category" stroke="#999" fontSize={12} width={80} />
+                               <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent'}} />
+                               <Bar dataKey="value" fill="#E8B930" radius={[0, 4, 4, 0]} barSize={30}>
+                                  <LabelList dataKey="value" position="right" fill="#fff" fontSize={12} />
+                               </Bar>
+                            </BarChart>
+                         </ResponsiveContainer>
+                      </CardContent>
+                   </Card>
+
+                   {/* Chart 2: Complaints per Channel */}
+                   <Card className="bg-[#252525] border-[#3C4144]">
+                      <CardHeader>
+                         <CardTitle className="text-base text-white">Reclamações por Canal</CardTitle>
+                         <CardDescription className="text-xs text-gray-400">Foco de problemas por canal</CardDescription>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+                        {dashboardData.chartComplaintsByCanal.length > 0 ? (
+                           <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={dashboardData.chartComplaintsByCanal} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                                 <XAxis dataKey="name" stroke="#666" fontSize={12} />
+                                 <YAxis stroke="#666" fontSize={12} />
+                                 <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent'}} />
+                                 <Bar dataKey="value" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40}>
+                                    <LabelList dataKey="value" position="top" fill="#fff" fontSize={12} />
+                                 </Bar>
+                              </BarChart>
+                           </ResponsiveContainer>
+                        ) : (
+                           <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                              Nenhuma reclamação registrada no período.
+                           </div>
+                        )}
+                      </CardContent>
+                   </Card>
+
+                   {/* Chart 3: Avg Rating per Channel */}
+                   <Card className="bg-[#252525] border-[#3C4144]">
+                      <CardHeader>
+                         <CardTitle className="text-base text-white">Média de Nota por Canal</CardTitle>
+                         <CardDescription className="text-xs text-gray-400">Avaliação média (0-10 ou 1-5)</CardDescription>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+                        {dashboardData.chartAvgRatingByCanal.length > 0 ? (
+                           <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={dashboardData.chartAvgRatingByCanal} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                                 <XAxis dataKey="name" stroke="#666" fontSize={12} />
+                                 <YAxis stroke="#666" fontSize={12} domain={[0, 'auto']} />
+                                 <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent'}} />
+                                 <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40}>
+                                    <LabelList dataKey="value" position="top" fill="#fff" fontSize={12} />
+                                 </Bar>
+                              </BarChart>
+                           </ResponsiveContainer>
+                        ) : (
+                           <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                              Nenhuma avaliação com nota registrada.
+                           </div>
+                        )}
+                      </CardContent>
+                   </Card>
+
+                   {/* Chart 4: Ticket Status */}
+                   <Card className="bg-[#252525] border-[#3C4144]">
+                      <CardHeader>
+                         <CardTitle className="text-base text-white">Status dos Tickets</CardTitle>
+                         <CardDescription className="text-xs text-gray-400">Distribuição por estado atual</CardDescription>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+                         <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                               <Pie
+                                  data={dashboardData.chartStatus}
+                                  cx="50%"
+                                  cy="50%"
+                                  labelLine={false}
+                                  outerRadius={80}
+                                  fill="#8884d8"
+                                  dataKey="value"
+                               >
+                                  {dashboardData.chartStatus.map((entry, index) => (
+                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  ))}
+                               </Pie>
+                               <Tooltip content={<CustomTooltip />} />
+                               <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                            </PieChart>
+                         </ResponsiveContainer>
+                      </CardContent>
+                   </Card>
+                </div>
+             </div>
+          )}
+
+          {/* List Section */}
+          <Card className="bg-[#252525] border-[#3C4144] shadow-xl">
+            <CardHeader className="border-b border-[#3C4144] pb-4">
+               <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-domine text-white flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-[#E8B930]" /> Listagem de Tickets
+                  </CardTitle>
+                  <div className="text-sm text-gray-400">Mostrando {paginatedTickets.length} de {tickets.length}</div>
+               </div>
+            </CardHeader>
+            <CardContent className="p-0">
+               <Table>
+                  <TableHeader className="bg-[#2F2F2F]">
+                     <TableRow className="border-b-[#3C4144] hover:bg-[#2F2F2F]">
+                        <TableHead className="text-gray-400 font-bold">Canal</TableHead>
+                        <TableHead className="text-gray-400 font-bold">Cliente</TableHead>
+                        <TableHead className="text-gray-400 font-bold">Tipo</TableHead>
+                        <TableHead className="text-gray-400 font-bold">Status</TableHead>
+                        <TableHead className="text-gray-400 font-bold">Nota</TableHead>
+                        <TableHead className="text-gray-400 font-bold">Resumo</TableHead>
+                        <TableHead className="text-gray-400 font-bold text-right">Data</TableHead>
+                     </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                     {paginatedTickets.length === 0 ? (
+                        <TableRow>
+                           <TableCell colSpan={7} className="text-center py-12 text-gray-500">Nenhum ticket encontrado.</TableCell>
+                        </TableRow>
+                     ) : (
+                        paginatedTickets.map((ticket, idx) => (
+                           <TableRow 
+                              key={idx} 
+                              onClick={() => handleTicketClick(ticket)}
+                              className="border-b-[#3C4144] hover:bg-[#2F2F2F] cursor-pointer transition-colors"
+                           >
+                              <TableCell className="text-gray-300 font-medium capitalize">{ticket.canal}</TableCell>
+                              <TableCell className="text-white">
+                                 <div className="flex flex-col">
+                                    <span>{ticket.autor_nome || 'Anônimo'}</span>
+                                    <span className="text-xs text-gray-500">{ticket.autor_contato}</span>
+                                 </div>
+                              </TableCell>
+                              <TableCell className="text-gray-300">{ticket.tipo || '-'}</TableCell>
+                              <TableCell>
+                                 <Badge className={getStatusColor(ticket.ticket_status)}>
+                                    {ticket.ticket_status || 'N/A'}
+                                 </Badge>
+                              </TableCell>
+                              <TableCell className="text-gray-300 font-mono">{ticket.nota || '—'}</TableCell>
+                              <TableCell className="text-gray-400 max-w-[300px] truncate" title={ticket.text}>
+                                 {ticket.text || '-'}
+                              </TableCell>
+                              <TableCell className="text-right text-gray-300">{formatDate(ticket.created_at)}</TableCell>
+                           </TableRow>
+                        ))
+                     )}
+                  </TableBody>
+               </Table>
+
+               {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="p-4 border-t border-[#3C4144] flex items-center justify-between bg-[#2F2F2F]">
+                  <span className="text-xs text-gray-500">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 p-0 border-[#4C4E50] bg-[#252525] text-gray-300 hover:bg-[#33393D] hover:text-white"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 p-0 border-[#4C4E50] bg-[#252525] text-gray-300 hover:bg-[#33393D] hover:text-white"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Detail Drawer */}
