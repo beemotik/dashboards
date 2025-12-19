@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, FileText, Download, Trash2, AlertTriangle, Save, Loader2, XCircle, ChevronLeft, ChevronRight, Check, Edit2, Plus } from 'lucide-react';
+import { X, FileText, Download, Trash2, AlertTriangle, Save, Loader2, XCircle, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
@@ -368,8 +368,8 @@ const MeetingDrawer = ({ meeting, open, onOpenChange, tenantId, onRefresh }) => 
   const [isBulkEditing, setIsBulkEditing] = useState(false);
   const [isSavingBulk, setIsSavingBulk] = useState(false);
   
-  // Evaluations Pagination
-  const [evaluationsPage, setEvaluationsPage] = useState(1);
+  // Evaluations Pagination - Start collapsed (0 = collapsed, 1+ = expanded with page)
+  const [evaluationsPage, setEvaluationsPage] = useState(0);
   const EVALUATIONS_PER_PAGE = 5;
 
   // Evaluations Processing - MOVED HERE (Before early return)
@@ -398,7 +398,7 @@ const MeetingDrawer = ({ meeting, open, onOpenChange, tenantId, onRefresh }) => 
       setSelectedEvaluationIndex(null);
       setIsBulkEditing(false);
       setIsSavingBulk(false);
-      setEvaluationsPage(1);
+      setEvaluationsPage(0); // Start collapsed
     }
   }, [open, meeting]);
 
@@ -413,10 +413,10 @@ const MeetingDrawer = ({ meeting, open, onOpenChange, tenantId, onRefresh }) => 
   const transcricaoText = localMeeting.transcription || localMeeting.transcricao;
 
   const totalEvaluationPages = Math.ceil(evaluations.length / EVALUATIONS_PER_PAGE);
-  const paginatedEvaluations = evaluations.slice(
+  const paginatedEvaluations = evaluationsPage > 0 ? evaluations.slice(
       (evaluationsPage - 1) * EVALUATIONS_PER_PAGE,
       evaluationsPage * EVALUATIONS_PER_PAGE
-  );
+  ) : [];
 
   const renderFormattedText = (text) => {
     if (!text) return null;
@@ -731,12 +731,12 @@ const MeetingDrawer = ({ meeting, open, onOpenChange, tenantId, onRefresh }) => 
                </div>
             </div>
 
-            {/* Evaluations Section with Table */}
+            {/* Evaluations Section with Expandable Card */}
             {evaluations.length > 0 && (
               <div className="border-t border-[#4C4E50] pt-6">
                 <div className="flex items-center justify-between mb-3">
                    <div className="text-sm uppercase tracking-wider text-[#E8B930] font-manrope font-bold">
-                      Notas e Comentários ({evaluations.length})
+                      Notas e Comentários
                    </div>
                    <Button 
                       size="sm" 
@@ -748,92 +748,132 @@ const MeetingDrawer = ({ meeting, open, onOpenChange, tenantId, onRefresh }) => 
                    </Button>
                 </div>
                 
-                <div className="rounded-md border border-[#4C4E50] overflow-hidden">
-                  <Table>
-                     <TableHeader className="bg-[#33393D]">
-                        <TableRow className="border-b-[#4C4E50] hover:bg-[#33393D]">
-                           <TableHead className="text-gray-300 font-bold w-[30%]">Avaliação</TableHead>
-                           <TableHead className="text-gray-300 font-bold w-[15%]">Nota</TableHead>
-                           <TableHead className="text-gray-300 font-bold w-[40%]">Comentário</TableHead>
-                           <TableHead className="text-gray-300 font-bold w-[15%]">Data</TableHead>
-                           <TableHead className="w-[50px]"></TableHead>
-                        </TableRow>
-                     </TableHeader>
-                     <TableBody>
-                        {paginatedEvaluations.map((ev, idx) => {
-                           // Calculate real index for callbacks
-                           const realIndex = (evaluationsPage - 1) * EVALUATIONS_PER_PAGE + idx;
-                           return (
-                              <TableRow 
-                                 key={idx} 
-                                 className="border-b-[#4C4E50] hover:bg-[#33393D] transition-colors"
-                              >
-                                 <TableCell className="font-medium text-white align-top">
-                                    {ev.item || 'Item sem nome'}
-                                    <div className="text-xs text-gray-500 mt-1">{ev.pillar}</div>
-                                 </TableCell>
-                                 <TableCell className="align-top">
-                                    <div className="flex flex-col gap-1">
-                                       {ev.score !== undefined && ev.score !== null ? (
-                                          <Badge className="w-fit font-mono bg-blue-900/40 text-blue-400 border-blue-900">
-                                            {ev.score}
-                                          </Badge>
-                                       ) : <span className="text-gray-600 text-xs italic">N/A</span>}
-                                       <span className="text-[10px] text-gray-500">IA: {ev.scoreAI != null ? ev.scoreAI : '-'}</span>
-                                    </div>
-                                 </TableCell>
-                                 <TableCell className="text-gray-300 text-sm align-top">
-                                    <div className="line-clamp-2" title={ev.comment}>
-                                       {ev.comment || <span className="text-gray-600 italic">Sem comentário</span>}
-                                    </div>
-                                 </TableCell>
-                                 <TableCell className="text-gray-400 text-xs align-top">
-                                    {formattedDate}
-                                 </TableCell>
-                                 <TableCell className="text-right align-top">
-                                    <Button 
-                                       variant="ghost" 
-                                       size="icon" 
-                                       onClick={() => setSelectedEvaluationIndex(realIndex)}
-                                       className="h-8 w-8 text-[#E8B930] hover:text-[#E8B930] hover:bg-[#E8B930]/10"
-                                       title="Editar"
-                                    >
-                                       <Edit2 className="w-4 h-4" />
-                                    </Button>
-                                 </TableCell>
-                              </TableRow>
-                           );
-                        })}
-                     </TableBody>
-                  </Table>
-                </div>
+                {/* Expandable Card */}
+                <div className="bg-[#33393D] rounded-lg border border-[#4C4E50] overflow-hidden">
+                  {/* Card Header - Always Visible */}
+                  <div 
+                    className="p-4 cursor-pointer hover:bg-[#3C4144] transition-colors flex items-center justify-between"
+                    onClick={() => setEvaluationsPage(prev => prev === 0 ? 1 : 0)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">Loja</div>
+                        <div className="text-white font-semibold">{localMeeting.storeName}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">Visitas</div>
+                        <div className="text-white font-semibold">1</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">Nota</div>
+                        <div className="text-white font-semibold">
+                          {evaluations.filter(e => e.score != null).length > 0 
+                            ? (evaluations.reduce((sum, e) => sum + (e.score || 0), 0) / evaluations.filter(e => e.score != null).length).toFixed(2)
+                            : 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">{evaluations.length} avaliações</span>
+                      {evaluationsPage === 0 ? (
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                      ) : (
+                        <ChevronLeft className="w-5 h-5 text-gray-400 rotate-90" />
+                      )}
+                    </div>
+                  </div>
 
-                {/* Pagination Controls */}
-                {totalEvaluationPages > 1 && (
-                   <div className="flex items-center justify-between mt-4">
-                      <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => setEvaluationsPage(prev => Math.max(prev - 1, 1))}
-                         disabled={evaluationsPage === 1}
-                         className="border-[#4C4E50] text-gray-300 hover:bg-[#3C4144] hover:text-white"
-                      >
-                         <ChevronLeft className="w-4 h-4 mr-1"/> Anterior
-                      </Button>
-                      <span className="text-xs text-gray-400">
-                         Página {evaluationsPage} de {totalEvaluationPages}
-                      </span>
-                      <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => setEvaluationsPage(prev => Math.min(prev + 1, totalEvaluationPages))}
-                         disabled={evaluationsPage === totalEvaluationPages}
-                         className="border-[#4C4E50] text-gray-300 hover:bg-[#3C4144] hover:text-white"
-                      >
-                         Próximo <ChevronRight className="w-4 h-4 ml-1"/>
-                      </Button>
-                   </div>
-                )}
+                  {/* Expanded Content - Table */}
+                  {evaluationsPage > 0 && (
+                    <div className="border-t border-[#4C4E50]">
+                      <Table>
+                        <TableHeader className="bg-[#2F2F2F]">
+                          <TableRow className="border-b-[#4C4E50] hover:bg-[#2F2F2F]">
+                            <TableHead className="text-gray-300 font-bold w-[25%]">Avaliação..</TableHead>
+                            <TableHead className="text-gray-300 font-bold w-[10%]">Nota</TableHead>
+                            <TableHead className="text-gray-300 font-bold w-[30%]">Comentário</TableHead>
+                            <TableHead className="text-gray-300 font-bold w-[20%]">Data da Reunião</TableHead>
+                            <TableHead className="text-gray-300 font-bold w-[15%] text-center">Ação</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedEvaluations.map((ev, idx) => {
+                            const realIndex = evaluationsPage > 0 ? (evaluationsPage - 1) * EVALUATIONS_PER_PAGE + idx : idx;
+                            return (
+                              <TableRow 
+                                key={idx} 
+                                className="border-b-[#4C4E50] hover:bg-[#2F2F2F] transition-colors"
+                              >
+                                <TableCell className="font-medium text-white align-top">
+                                  {ev.item || 'Item sem nome'}
+                                  <div className="text-xs text-gray-500 mt-1">{ev.pillar}</div>
+                                </TableCell>
+                                <TableCell className="align-top">
+                                  {ev.score !== undefined && ev.score !== null ? (
+                                    <span className="text-white font-semibold">{ev.score.toFixed(2)}</span>
+                                  ) : (
+                                    <span className="text-gray-600 text-xs italic">N/A</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-gray-300 text-sm align-top">
+                                  <div className="line-clamp-2" title={ev.comment}>
+                                    {ev.comment ? `"${ev.comment}"` : <span className="text-gray-600 italic">Sem comentário</span>}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-gray-400 text-sm align-top">
+                                  {formattedDate}
+                                </TableCell>
+                                <TableCell className="text-center align-top">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      console.log('Button clicked for evaluation:', realIndex);
+                                      setSelectedEvaluationIndex(realIndex);
+                                    }}
+                                    className="h-8 px-3 text-[#E8B930] border-[#E8B930] hover:bg-[#E8B930] hover:text-black"
+                                    title="Editar avaliação"
+                                  >
+                                    <Edit2 className="w-4 h-4 mr-1" />
+                                    Editar
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+
+                      {/* Pagination Controls */}
+                      {totalEvaluationPages > 1 && (
+                        <div className="flex items-center justify-between p-4 bg-[#2F2F2F] border-t border-[#4C4E50]">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEvaluationsPage(prev => Math.max(prev - 1, 1))}
+                            disabled={evaluationsPage === 1}
+                            className="border-[#4C4E50] text-gray-300 hover:bg-[#3C4144] hover:text-white"
+                          >
+                            <ChevronLeft className="w-4 h-4 mr-1"/> Anterior
+                          </Button>
+                          <span className="text-xs text-gray-400">
+                            Página {evaluationsPage} de {totalEvaluationPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEvaluationsPage(prev => Math.min(prev + 1, totalEvaluationPages))}
+                            disabled={evaluationsPage === totalEvaluationPages}
+                            className="border-[#4C4E50] text-gray-300 hover:bg-[#3C4144] hover:text-white"
+                          >
+                            Próximo <ChevronRight className="w-4 h-4 ml-1"/>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

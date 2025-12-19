@@ -1,17 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronRight, ArrowUpDown, ChevronLeft, Search, Download } from 'lucide-react';
+import { ChevronDown, ChevronRight, ArrowUpDown, ChevronLeft, Search, Download, Edit2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { exportToCSV } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 10;
 
 const ScoresCard = ({
   meetings,
-  loading,
-  filters
+  loading
 }) => {
   const [expandedRows, setExpandedRows] = useState({});
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
@@ -21,6 +23,12 @@ const ScoresCard = ({
   }); // Sorting for nested rows
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal states
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editedScore, setEditedScore] = useState('');
+  const [editedComment, setEditedComment] = useState('');
 
   const { processedData, summaryStats } = useMemo(() => {
     if (!meetings || meetings.length === 0) return { processedData: [], summaryStats: { avgScore: 0, totalVisits: 0 } };
@@ -183,6 +191,31 @@ const ScoresCard = ({
     exportToCSV(dataToExport, headers, 'Notas_Comentarios');
   };
 
+  // Modal functions
+  const openEditModal = (item) => {
+    setSelectedItem(item);
+    setEditedScore(item.score?.toString() || '');
+    setEditedComment(item.comment || '');
+    setIsModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setIsModalOpen(false);
+    setSelectedItem(null);
+    setEditedScore('');
+    setEditedComment('');
+  };
+
+  const handleSaveEdit = () => {
+    // Aqui você pode adicionar a lógica para salvar as alterações
+    console.log('Salvando alterações:', {
+      item: selectedItem,
+      newScore: editedScore,
+      newComment: editedComment
+    });
+    closeEditModal();
+  };
+
   const formatDate = dateString => {
     if (!dateString) return '-';
     try {
@@ -304,20 +337,21 @@ const ScoresCard = ({
                             <table className="w-full">
                                 <thead>
                                 <tr className="border-b border-[#4C4E50]">
-                                    <th className="text-left text-xs font-manrope font-semibold text-gray-400 pb-2 px-2 w-[40%]">Avaliação</th>
+                                    <th className="text-left text-xs font-manrope font-semibold text-gray-400 pb-2 px-2 w-[30%]">Avaliação</th>
                                     <th className="text-center text-xs font-manrope font-semibold text-gray-400 pb-2 px-2 w-[10%]">
                                     <button onClick={() => toggleNestedSort('score')} className="flex items-center justify-center gap-1 mx-auto hover:text-gold-light transition-colors">
                                         Nota
                                         <ArrowUpDown className="h-3 w-3" />
                                     </button>
                                     </th>
-                                    <th className="text-left text-xs font-manrope font-semibold text-gray-400 pb-2 px-2 w-[35%]">Comentário</th>
+                                    <th className="text-left text-xs font-manrope font-semibold text-gray-400 pb-2 px-2 w-[30%]">Comentário</th>
                                     <th className="text-center text-xs font-manrope font-semibold text-gray-400 pb-2 px-2 w-[15%]">
                                     <button onClick={() => toggleNestedSort('date')} className="flex items-center justify-center gap-1 mx-auto hover:text-gold-light transition-colors">
                                         Data da reunião
                                         <ArrowUpDown className="h-3 w-3" />
                                     </button>
                                     </th>
+                                    <th className="text-center text-xs font-manrope font-semibold text-gray-400 pb-2 px-2 w-[15%]">Ação</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -334,9 +368,24 @@ const ScoresCard = ({
                                     <td className="py-2 px-2 text-xs font-manrope text-gray-400 text-center align-top">
                                         {formatDate(item.date)}
                                     </td>
+                                    <td className="py-2 px-2 text-center align-top">
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openEditModal(item);
+                                            }}
+                                            className="h-6 px-2 text-[#E8B930] border-[#E8B930] hover:bg-[#E8B930] hover:text-black text-xs"
+                                            title="Editar avaliação"
+                                        >
+                                            <Edit2 className="w-3 h-3 mr-1" />
+                                            Editar
+                                        </Button>
+                                    </td>
                                     </tr>)}
                                 {row.items.length === 0 && <tr>
-                                    <td colSpan="4" className="py-4 text-center text-xs text-gray-500">
+                                    <td colSpan="5" className="py-4 text-center text-xs text-gray-500">
                                         Nenhum item avaliado encontrado.
                                     </td>
                                     </tr>}
@@ -378,6 +427,58 @@ const ScoresCard = ({
           </div>
         )}
       </div>
+
+      {/* Modal de Edição */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md bg-[#252525] border-[#3C4144] text-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-domine text-white">
+              Editar Avaliação
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedItem && (
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="text-sm text-gray-400 mb-2 block">Item Avaliado</Label>
+                <div className="text-white font-medium">{selectedItem.item}</div>
+              </div>
+              
+              <div>
+                <Label className="text-sm text-gray-400 mb-2 block">Nota</Label>
+                <Input
+                  type="number"
+                  value={editedScore}
+                  onChange={(e) => setEditedScore(e.target.value)}
+                  className="bg-[#33393D] border-[#4C4E50] text-white focus:border-[#E8B930]"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              
+              <div>
+                <Label className="text-sm text-gray-400 mb-2 block">Comentário</Label>
+                <Textarea
+                  value={editedComment}
+                  onChange={(e) => setEditedComment(e.target.value)}
+                  className="bg-[#33393D] border-[#4C4E50] text-white focus:border-[#E8B930] min-h-[80px]"
+                  placeholder="Adicione um comentário..."
+                />
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="ghost" onClick={closeEditModal} className="text-gray-400 hover:text-white">
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} className="bg-[#E8B930] text-black hover:bg-[#d1a525] font-bold">
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>;
 };
 export default ScoresCard;
