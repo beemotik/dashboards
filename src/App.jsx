@@ -15,6 +15,10 @@ import { Toaster } from '@/components/ui/toaster';
 import { AppProvider } from '@/context/AppContext';
 
 function App() {
+  // Debug log para verificar se a aplicação está carregando
+  console.log('App loading - Current URL:', window.location.href);
+  console.log('App loading - Search params:', window.location.search);
+  
   return (
     <>
       <Helmet>
