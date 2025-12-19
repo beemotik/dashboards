@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://beemotik.cloud/sitemap.xml
