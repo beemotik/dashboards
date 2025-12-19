@@ -1,0 +1,2 @@
+## Pages
+- [Dashboard](/)): Painel administrativo de dashboards da Beemotik
